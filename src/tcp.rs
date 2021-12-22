@@ -2,7 +2,7 @@ use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream};
 
-use crate::cipher::{decrypt_host};
+use crate::cipher::{decrypt_host, xor_cipher};
 
 pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
     let s = String::from_utf8_lossy(buf);
@@ -20,14 +20,16 @@ pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
 }
 
 pub async fn tcp_forward(src: &mut TcpStream, dest: &mut TcpStream) {
-    let mut d_buf = [0; 65535];
-    let mut len = src.read(&mut d_buf).await.unwrap();
+    let mut buf = [0; 65535];
+    let mut len = src.read(&mut buf).await.unwrap();
+    let mut rem: usize = 0;
     while len > 0 {
-        len = dest.write(&d_buf[0..len]).await.unwrap();
+        rem = xor_cipher(&mut buf[0..len], "quanyec", rem);
+        len = dest.write(&mut buf).await.unwrap();
         if len != 65535 {
             break;
         } else {
-            len = src.read(&mut d_buf).await.unwrap();
+            len = src.read(&mut buf).await.unwrap();
         }
     }
 }
