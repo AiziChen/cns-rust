@@ -4,12 +4,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
-use crate::tcp::{handle_tcp_session};
+use crate::tcp::handle_tcp_session;
 use crate::tools::{bytes_contains, is_http_header};
 
+mod cipher;
 mod tcp;
 mod tools;
-mod cipher;
 
 async fn response_header(socket: &mut TcpStream, buf: &[u8]) {
     if bytes_contains(&buf, "WebSocket".as_bytes()) {
@@ -27,28 +27,26 @@ async fn response_header(socket: &mut TcpStream, buf: &[u8]) {
     }
 }
 
-async fn handle_connection(socket: &mut TcpStream) {
+async fn handle_connection(mut socket: TcpStream) {
     let mut buf = [0; 65535];
-    loop {
-        let len = match socket.read(&mut buf).await {
-            Ok(len) if len == 0 => return,
-            Ok(len) => len,
-            Err(e) => {
-                eprintln!("failed to read from socket; err = {:?}", e);
-                return;
-            }
-        };
-
-        if is_http_header(&buf[0..len]) {
-            // response header
-            response_header(socket, &buf[0..len]).await;
-            // process tcp or udp
-            if !bytes_contains(&buf[0..len], b"httpUDP") {
-                handle_tcp_session(socket, &buf[0..len]).await;
-            }
-        } else {
-            // handle_udp_session(socket);
+    let len = match (&mut socket).read(&mut buf).await {
+        Ok(len) if len == 0 => return,
+        Ok(len) => len,
+        Err(e) => {
+            eprintln!("failed to read from socket; err = {:?}", e);
+            return;
         }
+    };
+
+    if is_http_header(&buf[0..len]) {
+        // response header
+        response_header(&mut socket, &buf[0..len]).await;
+        // process tcp or udp
+        if !bytes_contains(&buf[0..len], b"httpUDP") {
+            handle_tcp_session(socket, &buf[0..len]).await;
+        }
+    } else {
+        // handle_udp_session(socket);
     }
 }
 
@@ -56,10 +54,10 @@ async fn handle_connection(socket: &mut TcpStream) {
 async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("0.0.0.0:1080").await?;
     loop {
-        let (mut socket, _) = listener.accept().await?;
+        let (socket, _) = listener.accept().await?;
         spawn(async move {
             println!("Handle a new connection...");
-            handle_connection(&mut socket).await;
+            handle_connection(socket).await;
         });
     }
 }

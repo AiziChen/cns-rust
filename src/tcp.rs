@@ -1,6 +1,6 @@
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpStream};
+use tokio::net::TcpStream;
 
 use crate::cipher::{decrypt_host, xor_cipher};
 
@@ -34,7 +34,7 @@ pub async fn tcp_forward(src: &mut TcpStream, dest: &mut TcpStream) {
     }
 }
 
-pub async fn handle_tcp_session(socket: &mut TcpStream, buf: &[u8]) {
+pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
     let mut host = match get_proxy_host(buf) {
         Some(host) => host,
         None => return,
@@ -45,11 +45,10 @@ pub async fn handle_tcp_session(socket: &mut TcpStream, buf: &[u8]) {
         host.push_str(":80")
     }
 
-    let mut d_stream = TcpStream::connect(host).await.unwrap();
-    // spawn(async move {
-    tcp_forward(socket, &mut d_stream).await;
-    // });
-    tcp_forward(&mut d_stream, socket).await;
+    let mut dest = TcpStream::connect(host).await.unwrap();
+
+    tcp_forward(&mut socket, &mut dest).await;
+    tcp_forward(&mut dest, &mut socket).await;
 }
 
 #[test]
