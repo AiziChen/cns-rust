@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 
 const HEADERS: [&str; 13] = [
-    "GET", "POST", "HEAD", "PUT", "COPY", "DELETE", "MOVE", "OPTOINS", "LINK", "UNLINK", "TRACE",
+    "GET", "POST", "HEAD", "PUT", "COPY", "DELETE", "MOVE", "OPTIONS", "LINK", "UNLINK", "TRACE",
     "PATCH", "WRAPPED",
 ];
 

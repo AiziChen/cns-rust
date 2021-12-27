@@ -7,7 +7,7 @@ pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
         rem = (sub_index + i) % s_len;
         *b ^= secret[rem] | rem as u8;
     }
-    return rem;
+    return rem + 1;
 }
 
 pub unsafe fn decrypt_host(host: &mut str) -> Option<String> {
