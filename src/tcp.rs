@@ -1,5 +1,6 @@
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 
 use crate::cipher::{decrypt_host, xor_cipher};
@@ -16,17 +17,18 @@ pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
     return None;
 }
 
-pub async fn tcp_forward(src: &mut TcpStream, dest: &mut TcpStream) {
+pub async fn tcp_forward(src: &mut OwnedReadHalf, dest: &mut OwnedWriteHalf) {
     let mut buf = [0; 65535];
     let mut len = src.read(&mut buf).await.unwrap();
     let mut rem: usize = 0;
     while len > 0 {
         rem = xor_cipher(&mut buf[0..len], "quanyec", rem);
-        len = dest.write(&mut buf).await.unwrap();
-        if len != 65535 {
-            break;
-        } else {
+        dest.write(&mut buf[0..len]).await.unwrap();
+        println!("{}", String::from_utf8_lossy(&buf[0..len]));
+        if len >= 65535 {
             len = src.read(&mut buf).await.unwrap();
+        } else {
+            break;
         }
     }
 }
@@ -46,10 +48,14 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         host.push_str(":80")
     }
 
-    let mut dest = TcpStream::connect(host).await.unwrap();
-
-    tcp_forward(&mut socket, &mut dest).await;
-    tcp_forward(&mut dest, &mut socket).await;
+    let dest = TcpStream::connect(host).await.unwrap();
+    let (mut sread, mut swrite) = socket.into_split();
+    let (mut dread, mut dwrite) = dest.into_split();
+    tokio::join!(
+        tcp_forward(&mut sread, &mut dwrite),
+        tcp_forward(&mut dread, &mut swrite)
+    );
+    println!("connection has ended.");
 }
 
 #[test]
