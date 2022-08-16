@@ -1,4 +1,3 @@
-
 pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
     let secret = secret.as_bytes();
     let s_len = secret.len();
@@ -10,7 +9,7 @@ pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
     return rem + 1;
 }
 
-pub unsafe fn decrypt_host(host: &mut str) -> Option<String> {
+pub fn decrypt_host(host: &mut str) -> Option<String> {
     return match base64::decode(host) {
         Ok(mut host) => {
             xor_cipher(&mut host[..], "quanyec", 0);

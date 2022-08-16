@@ -6,14 +6,11 @@ use crate::cipher::{decrypt_host, xor_cipher};
 
 pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
     let s = String::from_utf8_lossy(buf);
-    let re = Regex::new("Meng:\\s*(.*)\r").unwrap();
-    for n in re.captures_iter(s.as_ref()) {
-        return match n.get(1) {
+    let re = Regex::new(r"Meng:\s*(.*)\r").unwrap();
+    for cap in re.captures_iter(s.as_ref()) {
+        return match cap.get(1) {
             None => None,
-            Some(host) => unsafe {
-                let mut host = String::from(host.as_str()).to_string();
-                decrypt_host(&mut host)
-            },
+            Some(host) => Some(String::from(host.as_str())),
         };
     }
     return None;
@@ -39,6 +36,10 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         Some(host) => host,
         None => return,
     };
+    let mut host = match decrypt_host(&mut host) {
+        Some(host) => host,
+        None => return,
+    };
     println!("proxy host: {}", host);
 
     if !host.contains(":") {
@@ -53,6 +54,10 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
 
 #[test]
 fn get_proxy_host_test() {
+    let buf = b"Meng:   m.quanye.org\r\nla";
+    assert!(get_proxy_host(buf).unwrap().eq("m.quanye.org"));
     let buf = b"abcMeng:   m.quanye.org\r\nla";
+    assert!(get_proxy_host(buf).unwrap().eq("m.quanye.org"));
+    let buf = b"abcMeng:   m.quanye.org\r\n\r\n";
     assert!(get_proxy_host(buf).unwrap().eq("m.quanye.org"));
 }
