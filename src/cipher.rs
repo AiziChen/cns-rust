@@ -21,3 +21,23 @@ pub fn decrypt_host(host: &mut str) -> Option<String> {
         }
     };
 }
+
+#[test]
+fn xor_cipher_test() {
+    unsafe {
+        let mut raw_msg = String::from("Hi from there");
+        let raw_buf = raw_msg.as_bytes_mut();
+        let mut rem = 0;
+        rem = xor_cipher(&mut raw_buf[..2], "secret1", rem);
+        println!("rem: {}", rem);
+        rem = xor_cipher(&mut raw_buf[2..], "secret1", rem);
+        println!("rem: {}", rem);
+
+        let mut drem = 0;
+        drem = xor_cipher(&mut raw_buf[..2], "secret1", drem);
+        println!("drem: {}", drem);
+        drem = xor_cipher(&mut raw_buf[2..], "secret1", drem);
+        println!("drem: {}", drem);
+        assert_ne!(String::from_utf8_lossy(&raw_buf).to_string(), raw_msg);
+    }
+}
