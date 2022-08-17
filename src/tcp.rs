@@ -24,11 +24,10 @@ pub async fn tcp_forward(src: &mut OwnedReadHalf, dest: &mut OwnedWriteHalf) {
     while len > 0 {
         rem = xor_cipher(&mut buf[0..len], "quanyec", rem);
         dest.write(&mut buf[0..len]).await.unwrap();
-        println!("{}", String::from_utf8_lossy(&buf[0..len]));
-        if len >= 65535 {
-            len = src.read(&mut buf).await.unwrap();
-        } else {
-            break;
+        dest.flush().await.unwrap();
+        match src.read(&mut buf).await {
+            Ok(len2) => len = len2,
+            Err(_) => return,
         }
     }
 }
@@ -52,8 +51,8 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
     let (mut sread, mut swrite) = socket.into_split();
     let (mut dread, mut dwrite) = dest.into_split();
     tokio::join!(
+        tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),
-        tcp_forward(&mut dread, &mut swrite)
     );
     println!("connection has ended.");
 }
