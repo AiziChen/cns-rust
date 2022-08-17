@@ -12,7 +12,7 @@ pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
 pub fn decrypt_host(host: &mut str) -> Option<String> {
     return match base64::decode(host) {
         Ok(mut host) => {
-            xor_cipher(&mut host[..], "quanyec", 0);
+            xor_cipher(&mut host, "quanyec", 0);
             Some(String::from_utf8_lossy(&host[0..host.len() - 1]).to_string())
         }
         Err(e) => {
@@ -38,6 +38,6 @@ fn xor_cipher_test() {
         println!("drem: {}", drem);
         drem = xor_cipher(&mut buf[2..], "secret1", drem);
         println!("drem: {}", drem);
-        assert_ne!(String::from_utf8_lossy(&buf).to_string(), raw_msg);
+        assert_eq!(String::from_utf8_lossy(&buf).to_string(), raw_msg);
     }
 }

@@ -1,17 +1,18 @@
-use regex::Regex;
+use once_cell::sync::Lazy;
+use regex::bytes::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 
 use crate::cipher::{decrypt_host, xor_cipher};
 
+const HOST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Meng:\s*(.*)\r").unwrap());
+
 pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
-    let s = String::from_utf8_lossy(buf);
-    let re = Regex::new(r"Meng:\s*(.*)\r").unwrap();
-    for cap in re.captures_iter(s.as_ref()) {
+    for cap in HOST_RE.captures_iter(&buf) {
         return match cap.get(1) {
             None => None,
-            Some(host) => Some(String::from(host.as_str())),
+            Some(host) => Some(String::from_utf8_lossy(host.as_bytes()).to_string()),
         };
     }
     return None;
@@ -24,6 +25,7 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
         if len > 0 {
             rem = xor_cipher(&mut buf[..len], "quanyec", rem);
             dest.write(&mut buf[..len]).await.unwrap();
+            dest.flush().await.unwrap();
         } else {
             // end of file
             break;

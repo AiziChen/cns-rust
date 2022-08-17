@@ -1,32 +1,28 @@
+use once_cell::sync::Lazy;
+use regex::bytes::Regex;
 use std::borrow::Borrow;
 
-const HEADERS: [&str; 13] = [
-    "GET", "POST", "HEAD", "PUT", "COPY", "DELETE", "MOVE", "OPTIONS", "LINK", "UNLINK", "TRACE",
-    "PATCH", "WRAPPED",
-];
+const METHOD_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^GET|^POST|^HEAD|^PUT|^COPY|^DELETE|^MOVE|^OPTIONS|^LINK|^UNLINK|^TRACE|^PATCH|^WRAPPED",
+    )
+    .unwrap()
+});
 
 pub fn is_http_header(data: &[u8]) -> bool {
-    for header in HEADERS {
-        if data.starts_with(header.as_bytes()) {
-            return true;
-        }
-    }
-    return false;
+    return METHOD_RE.is_match(data);
 }
 
-pub fn bytes_contains(buff : &[u8], dest : &[u8]) -> bool {
+pub fn bytes_contains(buf: &[u8], dest: &[u8]) -> bool {
     let s_len = dest.len();
-    let mut count = 0;
     let mut i: usize = 0;
-    for b in buff {
+    for b in buf {
         if b == dest[i].borrow() {
-            count += 1;
-            if count >= s_len {
+            i += 1;
+            if i >= s_len {
                 return true;
             }
-            i += 1;
         } else {
-            count = 0;
             i = 0;
         }
     }
@@ -35,8 +31,14 @@ pub fn bytes_contains(buff : &[u8], dest : &[u8]) -> bool {
 
 #[test]
 fn bytes_contains_test() {
-    assert!(bytes_contains("Hello, world".as_bytes(), ", wor".as_bytes()));
+    assert!(bytes_contains(
+        "Hello, world".as_bytes(),
+        ", wor".as_bytes()
+    ));
     assert!(bytes_contains("Hello, world".as_bytes(), ", ".as_bytes()));
-    assert!(bytes_contains("Hello, world".as_bytes(), "Hello".as_bytes()));
+    assert!(bytes_contains(
+        "Hello, world".as_bytes(),
+        "Hello".as_bytes()
+    ));
     assert!(!bytes_contains("Hello, world".as_bytes(), "la".as_bytes()));
 }
