@@ -21,8 +21,13 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
     let mut buf = [0; 65536];
     let mut rem: usize = 0;
     while let Ok(len) = src.read(&mut buf).await {
-        rem = xor_cipher(&mut buf[..len], "quanyec", rem);
-        dest.write(&mut buf[..len]).await.unwrap();
+        if len > 0 {
+            rem = xor_cipher(&mut buf[..len], "quanyec", rem);
+            dest.write(&mut buf[..len]).await.unwrap();
+        } else {
+            // end of file
+            break;
+        }
     }
 }
 

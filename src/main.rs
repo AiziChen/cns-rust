@@ -38,12 +38,12 @@ async fn handle_connection(mut socket: TcpStream) {
         }
     };
 
-    if is_http_header(&buf[0..len]) {
+    if is_http_header(&buf[..len]) {
         // response header
-        response_header(&mut socket, &buf[0..len]).await;
+        response_header(&mut socket, &buf[..len]).await;
         // process tcp or udp
-        if !bytes_contains(&buf[0..len], b"httpUDP") {
-            handle_tcp_session(socket, &buf[0..len]).await;
+        if !bytes_contains(&buf[..len], b"httpUDP") {
+            handle_tcp_session(socket, &buf[..len]).await;
         }
     } else {
         // handle_udp_session(socket);
