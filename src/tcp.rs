@@ -1,6 +1,6 @@
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 
 use crate::cipher::{decrypt_host, xor_cipher};
@@ -17,7 +17,7 @@ pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
     return None;
 }
 
-pub async fn tcp_forward(src: &mut OwnedReadHalf, dest: &mut OwnedWriteHalf) {
+pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
     let mut buf = [0; 65536];
     let mut rem: usize = 0;
     while let Ok(len) = src.read(&mut buf).await {
@@ -41,9 +41,9 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         host.push_str(":80")
     }
 
-    let dest = TcpStream::connect(host).await.unwrap();
-    let (mut sread, mut swrite) = socket.into_split();
-    let (mut dread, mut dwrite) = dest.into_split();
+    let mut dest = TcpStream::connect(host).await.unwrap();
+    let (mut sread, mut swrite) = socket.split();
+    let (mut dread, mut dwrite) = dest.split();
     tokio::join!(
         tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),
