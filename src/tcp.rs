@@ -18,17 +18,11 @@ pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
 }
 
 pub async fn tcp_forward(src: &mut OwnedReadHalf, dest: &mut OwnedWriteHalf) {
-    let mut buf = [0; 65535];
-    let mut len = src.read(&mut buf).await.unwrap();
+    let mut buf = [0; 65536];
     let mut rem: usize = 0;
-    while len > 0 {
-        rem = xor_cipher(&mut buf[0..len], "quanyec", rem);
-        dest.write(&mut buf[0..len]).await.unwrap();
-        dest.flush().await.unwrap();
-        match src.read(&mut buf).await {
-            Ok(len2) => len = len2,
-            Err(_) => return,
-        }
+    while let Ok(len) = src.read(&mut buf).await {
+        rem = xor_cipher(&mut buf[..len], "quanyec", rem);
+        dest.write(&mut buf[..len]).await.unwrap();
     }
 }
 

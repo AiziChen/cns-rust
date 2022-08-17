@@ -28,7 +28,7 @@ async fn response_header(socket: &mut TcpStream, buf: &[u8]) {
 }
 
 async fn handle_connection(mut socket: TcpStream) {
-    let mut buf = [0; 65535];
+    let mut buf = [0; 65536];
     let len = match (&mut socket).read(&mut buf).await {
         Ok(len) if len == 0 => return,
         Ok(len) => len,
