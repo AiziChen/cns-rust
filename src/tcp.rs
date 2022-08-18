@@ -1,3 +1,4 @@
+use log::{error, info};
 use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -25,7 +26,7 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
         if len > 0 {
             rem = xor_cipher(&mut buf[..len], "quanyec", rem);
             if let Err(err) = dest.write(&mut buf[..len]).await {
-                eprintln!("Write occurred error: {:?}", err);
+                error!("Write occurred error: {:?}", err);
                 break;
             }
         } else {
@@ -44,7 +45,7 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         Some(host) => host,
         None => return,
     };
-    println!("proxy host: {}", host);
+    info!("proxy host: {}", host);
 
     if !host.contains(":") {
         host.push_str(":80")
@@ -57,7 +58,7 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),
     );
-    println!("connection ended: {}", host);
+    info!("connection ended: {}", host);
 }
 
 #[test]

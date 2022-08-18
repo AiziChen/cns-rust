@@ -2,6 +2,7 @@ use std::error::Error;
 use std::os::unix::prelude::AsRawFd;
 
 use config::set_max_nofile;
+use log::{error, info};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
@@ -18,15 +19,15 @@ mod tools;
 async fn response_header(socket: &mut TcpStream, buf: &[u8]) {
     if bytes_contains(&buf, "WebSocket".as_bytes()) {
         if let Err(e) = socket.write_all("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: CuteBi Network Tunnel, (%>w<%)\r\n\r\n".as_bytes()).await {
-            eprintln!("failed to write to socket; err = {:?}", e);
+            error!("failed to write to socket; err = {:?}", e);
         }
     } else if bytes_contains(&buf, "CON".as_bytes()) {
         if let Err(e) = socket.write_all("HTTP/1.1 200 Connection established\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
-            eprintln!("failed to write to socket; err = {:?}", e);
+            error!("failed to write to socket; err = {:?}", e);
         }
     } else {
         if let Err(e) = socket.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
-            eprintln!("failed to write to socket; err = {:?}", e);
+            error!("failed to write to socket; err = {:?}", e);
         }
     }
 }
@@ -37,7 +38,7 @@ async fn handle_connection(mut socket: TcpStream) {
         Ok(len) if len == 0 => return,
         Ok(len) => len,
         Err(e) => {
-            eprintln!("failed to read from socket; err = {:?}", e);
+            error!("failed to read from socket; err = {:?}", e);
             return;
         }
     };
@@ -56,6 +57,8 @@ async fn handle_connection(mut socket: TcpStream) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    std::env::set_var("RUST_LOG", "cns_rust");
+    env_logger::init();
     set_max_nofile();
     let listener = TcpListener::bind("0.0.0.0:1080").await?;
     let fd = listener.as_raw_fd();
@@ -63,7 +66,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         let (socket, _) = listener.accept().await?;
         spawn(async move {
-            println!("Handle a new connection...");
+            info!("Handle a new connection...");
             handle_connection(socket).await;
         });
     }

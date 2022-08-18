@@ -1,3 +1,4 @@
+use log::warn;
 use rlimit::{setrlimit, Resource};
 use std::mem;
 
@@ -16,7 +17,7 @@ pub fn enable_tcp_fastopen(sockfd: i32) -> bool {
         );
         if ret < 0 {
             let err = std::io::Error::last_os_error();
-            eprintln!("Set `TCP_FASTOPEN` error: {:?}", err);
+            warn!("Set `TCP_FASTOPEN` error: {:?}", err);
             return false;
         } else {
             return true;
