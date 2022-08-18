@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::mem;
 use std::os::unix::prelude::AsRawFd;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -7,7 +6,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
 use crate::tcp::handle_tcp_session;
-use crate::tools::{bytes_contains, is_http_header};
+use crate::tools::{bytes_contains, enable_tcp_fastopen, is_http_header};
 
 mod cipher;
 mod tcp;
@@ -56,20 +55,7 @@ async fn handle_connection(mut socket: TcpStream) {
 async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("0.0.0.0:1080").await?;
     let fd = listener.as_raw_fd();
-    let queue: libc::c_int = 1024;
-    unsafe {
-        let ret = libc::setsockopt(
-            fd,
-            libc::IPPROTO_TCP,
-            libc::TCP_FASTOPEN,
-            &queue as *const _ as *const libc::c_void,
-            mem::size_of_val(&queue) as libc::socklen_t,
-        );
-        if ret != 0 {
-            let err = std::io::Error::last_os_error();
-            eprint!("set TCP_FASTOPEN error: {:?}", err);
-        }
-    }
+    enable_tcp_fastopen(fd);
     loop {
         let (socket, _) = listener.accept().await?;
         spawn(async move {
