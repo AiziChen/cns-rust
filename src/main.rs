@@ -1,14 +1,17 @@
 use std::error::Error;
 use std::os::unix::prelude::AsRawFd;
 
+use config::set_max_nofile;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 
+use crate::config::enable_tcp_fastopen;
 use crate::tcp::handle_tcp_session;
-use crate::tools::{bytes_contains, enable_tcp_fastopen, is_http_header};
+use crate::tools::{bytes_contains, is_http_header};
 
 mod cipher;
+mod config;
 mod tcp;
 mod tools;
 
@@ -53,6 +56,7 @@ async fn handle_connection(mut socket: TcpStream) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    set_max_nofile();
     let listener = TcpListener::bind("0.0.0.0:1080").await?;
     let fd = listener.as_raw_fd();
     enable_tcp_fastopen(fd);

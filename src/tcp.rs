@@ -48,14 +48,14 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         host.push_str(":80")
     }
 
-    let mut dest = TcpStream::connect(host).await.unwrap();
+    let mut dest = TcpStream::connect(&host).await.unwrap();
     let (mut sread, mut swrite) = socket.split();
     let (mut dread, mut dwrite) = dest.split();
     tokio::join!(
         tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),
     );
-    println!("connection has ended.");
+    println!("connection ended: {}", host);
 }
 
 #[test]
