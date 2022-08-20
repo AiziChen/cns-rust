@@ -26,7 +26,7 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
         if len > 0 {
             rem = xor_cipher(&mut buf[..len], "quanyec", rem);
             if let Err(err) = dest.write(&mut buf[..len]).await {
-                error!("Write occurred error: {:?}", err);
+                error!("Write data occurred error: {}", err.to_string());
                 break;
             }
         } else {
@@ -36,7 +36,7 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
     }
 }
 
-pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
+pub async fn handle_tcp_session(socket: &mut TcpStream, buf: &[u8]) {
     let mut host = match get_proxy_host(buf) {
         Some(host) => host,
         None => return,
@@ -51,14 +51,20 @@ pub async fn handle_tcp_session(mut socket: TcpStream, buf: &[u8]) {
         host.push_str(":80")
     }
 
-    let mut dest = TcpStream::connect(&host).await.unwrap();
+    let mut dest = match TcpStream::connect(&host).await {
+        Ok(socket) => socket,
+        Err(err) => {
+            error!("Connect to {} failed, reason: {}", host, err.to_string());
+            return;
+        }
+    };
     let (mut sread, mut swrite) = socket.split();
     let (mut dread, mut dwrite) = dest.split();
     tokio::join!(
         tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),
     );
-    info!("connection ended: {}", host);
+    info!("tcp connection ended: {}", host);
 }
 
 #[test]

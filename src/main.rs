@@ -32,7 +32,7 @@ async fn response_header(socket: &mut TcpStream, buf: &[u8]) {
     }
 }
 
-async fn handle_connection(mut socket: TcpStream) {
+async fn handle_connection(mut socket: &mut TcpStream) {
     let mut buf = [0; 65536];
     let len = match (&mut socket).read(&mut buf).await {
         Ok(len) if len == 0 => return,
@@ -48,7 +48,7 @@ async fn handle_connection(mut socket: TcpStream) {
         response_header(&mut socket, &buf[..len]).await;
         // process tcp or udp
         if !bytes_contains(&buf[..len], b"httpUDP") {
-            handle_tcp_session(socket, &buf[..len]).await;
+            handle_tcp_session(&mut socket, &buf[..len]).await;
         }
     } else {
         // handle_udp_session(socket);
@@ -64,10 +64,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let fd = listener.as_raw_fd();
     enable_tcp_fastopen(fd);
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (mut socket, _) = listener.accept().await?;
         spawn(async move {
             info!("Handle a new connection...");
-            handle_connection(socket).await;
+            handle_connection(&mut socket).await;
         });
     }
 }

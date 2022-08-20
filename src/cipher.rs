@@ -1,3 +1,4 @@
+use log::error;
 pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
     let secret = secret.as_bytes();
     let s_len = secret.len();
@@ -15,8 +16,8 @@ pub fn decrypt_host(host: &mut str) -> Option<String> {
             xor_cipher(&mut host, "quanyec", 0);
             Some(String::from_utf8_lossy(&host[0..host.len() - 1]).to_string())
         }
-        Err(e) => {
-            eprintln!("Error: {}", e);
+        Err(err) => {
+            error!("Error: {}", err.to_string());
             None
         }
     };
