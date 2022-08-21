@@ -6,6 +6,7 @@ use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 
 use crate::cipher::{decrypt_host, xor_cipher};
+use crate::dns::dns_tcp_over_udp;
 
 const HOST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Meng:\s*(.*)\r").unwrap());
 
@@ -36,8 +37,8 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
     }
 }
 
-pub async fn handle_tcp_session(socket: &mut TcpStream, buf: &[u8]) {
-    let mut host = match get_proxy_host(buf) {
+pub async fn handle_tcp_session(mut socket: &mut TcpStream, mut buf: &mut [u8]) {
+    let mut host = match get_proxy_host(&buf) {
         Some(host) => host,
         None => return,
     };
@@ -46,6 +47,12 @@ pub async fn handle_tcp_session(socket: &mut TcpStream, buf: &[u8]) {
         None => return,
     };
     info!("proxy host: {}", host);
+
+    // TODO: `dns-over-udp` configuration
+    if host.ends_with(":53") {
+        dns_tcp_over_udp(&mut socket, &host, &mut buf).await;
+        return;
+    }
 
     if !host.contains(":") {
         host.push_str(":80")
