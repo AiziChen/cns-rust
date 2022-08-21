@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     std::env::set_var("RUST_LOG", "cns_rust");
     env_logger::init();
     set_max_nofile();
-    let listener = TcpListener::bind("0.0.0.0:1080").await?;
+    let listener = TcpListener::bind("[::]:1080").await?;
     let fd = listener.as_raw_fd();
     enable_tcp_fastopen(fd);
     loop {
