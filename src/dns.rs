@@ -38,7 +38,7 @@ pub async fn dns_tcp_over_udp(socket: &mut TcpStream, host: &str, mut buf: &mut 
         }
     };
     let rlen = match udp_socket.recv(&mut buf[2..]).await {
-        Ok(len) if len <= 0 => return,
+        Ok(len) if len == 0 => return,
         Ok(len) => len,
         Err(err) => {
             error!(
