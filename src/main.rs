@@ -65,7 +65,7 @@ async fn handle_connection(mut socket: &mut TcpStream) {
         }
     } else {
         /* process UDP */
-        handle_udp_session(&mut socket);
+        handle_udp_session(&mut socket, &mut buf[..len]).await;
     }
 }
 
