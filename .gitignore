@@ -1,6 +1,6 @@
-/.idea
+.idea/
+.vscode/
 *.lock
 *~
-/target
+target/
 .DS_Store
-
