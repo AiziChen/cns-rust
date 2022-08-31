@@ -23,7 +23,11 @@ pub async fn dns_tcp_over_udp(socket: &mut TcpStream, host: &str, mut buf: &mut 
 
     let udp_socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
     match udp_socket.send_to(&buf[2..rlen], &host).await {
-        Ok(len) => len,
+        Ok(len) => {
+            if len != rlen - 2 {
+                return;
+            }
+        }
         Err(err) => {
             error!(
                 "connected to host {} occurred error: {}",

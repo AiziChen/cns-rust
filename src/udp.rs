@@ -68,25 +68,23 @@ async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> i32 {
     let mut pkg_sub = 0usize;
     while pkg_sub + 2 < buf.len() {
         let pkg_len = (buf[pkg_sub] as u16 | ((buf[pkg_sub + 1] as u16) << 8)) as usize;
-        println!("pkgSub: {}, pkgLen: {}, {}", pkg_sub, pkg_len, buf.len());
+        info!("pkgSub: {}, pkgLen: {}, {}", pkg_sub, pkg_len, buf.len());
         if pkg_sub + 2 + pkg_len > buf.len() || pkg_len <= 10 {
             return 0;
         }
         if buf.starts_with(&[0u8; 2]) {
             return 1;
         }
-        let addr: SocketAddr;
-        let udp_header_len: usize;
-        if buf[5] == 1 {
+        let (addr, udp_header_len) = if buf[5] == 1 {
             /* ipv4 */
             let ipv4 = Ipv4Addr::from(u32::from_be_bytes(
                 buf[pkg_sub + 6..pkg_sub + 10].try_into().unwrap(),
             ));
-            addr = SocketAddr::new(
+            let addr = SocketAddr::new(
                 IpAddr::V4(ipv4),
                 ((buf[pkg_sub + 10] as u16) << 8) | (buf[pkg_sub + 11] as u16),
             );
-            udp_header_len = 12;
+            (addr, 12)
         } else {
             if pkg_len <= 24 {
                 return 0;
@@ -95,12 +93,12 @@ async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> i32 {
             let ipv6 = Ipv6Addr::from(u128::from_be_bytes(
                 buf[pkg_sub + 6..pkg_sub + 22].try_into().unwrap(),
             ));
-            addr = SocketAddr::new(
+            let addr = SocketAddr::new(
                 IpAddr::V6(ipv6),
                 ((buf[pkg_sub + 22] as u16) << 8) | buf[pkg_sub + 23] as u16,
             );
-            udp_header_len = 24;
-        }
+            (addr, 24)
+        };
         // write to destination
         if let Err(err) = socket
             .send_to(
@@ -133,8 +131,8 @@ async fn udp_client_to_server(
     let mut payload_len: usize;
     let wlen = wlen as usize;
     if wlen < buf.len() {
-        payload[..buf.len() - wlen].copy_from_slice(&buf[wlen..]);
         payload_len = buf.len() - wlen;
+        payload[..payload_len].copy_from_slice(&buf[wlen..]);
     } else {
         payload_len = 0;
     };
@@ -179,12 +177,6 @@ pub async fn handle_udp_session(cstream: &mut TcpStream, mut buf: &mut [u8]) {
         error!("Not httpUDP protocol");
         return;
     };
-    // let c2s_rem = if de[2..5].iter().filter(|&v| *v == 0).count() >= 1 {
-    //     xor_cipher(&mut buf, "quanyec", 0)
-    // } else {
-    //     error!("Not httpUDP protocol");
-    //     return;
-    // };
 
     let udp_socket = match UdpSocket::bind("0.0.0.0:0").await {
         Ok(socket) => socket,
