@@ -1,3 +1,5 @@
+use std::io::Error;
+
 use log::{error, info};
 use once_cell::sync::Lazy;
 use regex::bytes::Regex;
@@ -20,7 +22,7 @@ pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
     return None;
 }
 
-pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
+pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) -> Result<(), Error> {
     let mut buf = [0; 65536];
     let mut rem: usize = 0;
     while let Ok(len) = src.read(&mut buf).await {
@@ -28,13 +30,14 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
             rem = xor_cipher(&mut buf[..len], "quanyec", rem);
             if let Err(err) = dest.write(&mut buf[..len]).await {
                 error!("Write data occurred error: {}", err.to_string());
-                break;
+                return Err(err);
             }
         } else {
             // end of file
             break;
         }
     }
+    Ok(())
 }
 
 pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) {
@@ -67,7 +70,7 @@ pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) 
     };
     let (mut sread, mut swrite) = stream.split();
     let (mut dread, mut dwrite) = dest.split();
-    tokio::join!(
+    let _ = tokio::try_join!(
         tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),
     );
