@@ -20,19 +20,19 @@ mod tcp;
 mod tools;
 mod udp;
 
-async fn response_header(socket: &mut TcpStream, buf: &[u8]) -> bool {
+async fn response_header(stream: &mut TcpStream, buf: &[u8]) -> bool {
     if bytes_contains(&buf, "WebSocket".as_bytes()) {
-        if let Err(e) = socket.write_all("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: CuteBi Network Tunnel, (%>w<%)\r\n\r\n".as_bytes()).await {
+        if let Err(e) = stream.write_all("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: CuteBi Network Tunnel, (%>w<%)\r\n\r\n".as_bytes()).await {
             error!("failed to write to socket; err = {:?}", e);
             return false;
         }
     } else if bytes_contains(&buf, "CON".as_bytes()) {
-        if let Err(e) = socket.write_all("HTTP/1.1 200 Connection established\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
+        if let Err(e) = stream.write_all("HTTP/1.1 200 Connection established\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
             error!("failed to write to socket; err = {:?}", e);
             return false;
         }
     } else {
-        if let Err(e) = socket.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
+        if let Err(e) = stream.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
             error!("failed to write to socket; err = {:?}", e);
             return false;
         }
@@ -42,9 +42,9 @@ async fn response_header(socket: &mut TcpStream, buf: &[u8]) -> bool {
 }
 
 #[async_recursion]
-async fn handle_connection(mut socket: &mut TcpStream) {
+async fn handle_connection(mut stream: &mut TcpStream) {
     let mut buf = [0; 65536];
-    let len = match (&mut socket).read(&mut buf).await {
+    let len = match (&mut stream).read(&mut buf).await {
         Ok(len) if len == 0 => return,
         Ok(len) => len,
         Err(e) => {
@@ -55,17 +55,17 @@ async fn handle_connection(mut socket: &mut TcpStream) {
 
     if is_http_header(&buf[..len]) {
         /* process TCP */
-        let status = response_header(&mut socket, &buf[..len]).await;
+        let status = response_header(&mut stream, &buf[..len]).await;
         if status {
             if !bytes_contains(&buf[..len], b"httpUDP") {
-                handle_tcp_session(&mut socket, &mut buf[..len]).await;
+                handle_tcp_session(&mut stream, &mut buf[..len]).await;
             } else {
-                handle_connection(&mut socket).await;
+                handle_connection(&mut stream).await;
             }
         }
     } else {
         /* process UDP */
-        handle_udp_session(&mut socket, &mut buf[..len]).await;
+        handle_udp_session(&mut stream, &mut buf[..len]).await;
     }
 }
 
@@ -75,13 +75,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     set_max_nofile();
     let listener = TcpListener::bind("[::]:1080").await?;
-    let fd = listener.as_raw_fd();
-    enable_tcp_fastopen(fd);
+    enable_tcp_fastopen(listener.as_raw_fd());
     loop {
-        let (mut socket, _) = listener.accept().await?;
+        let (mut stream, _) = listener.accept().await?;
         spawn(async move {
             info!("Handle a new connection...");
-            handle_connection(&mut socket).await;
+            handle_connection(&mut stream).await;
         });
     }
 }

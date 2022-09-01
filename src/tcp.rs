@@ -37,7 +37,7 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) {
     }
 }
 
-pub async fn handle_tcp_session(mut socket: &mut TcpStream, mut buf: &mut [u8]) {
+pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) {
     let mut host = match get_proxy_host(&buf) {
         Some(host) => host,
         None => return,
@@ -50,7 +50,7 @@ pub async fn handle_tcp_session(mut socket: &mut TcpStream, mut buf: &mut [u8]) 
 
     // TODO: `dns-over-udp` configuration
     if host.ends_with(":53") {
-        dns_tcp_over_udp(&mut socket, &host, &mut buf).await;
+        dns_tcp_over_udp(&mut stream, &host, &mut buf).await;
         return;
     }
 
@@ -59,13 +59,13 @@ pub async fn handle_tcp_session(mut socket: &mut TcpStream, mut buf: &mut [u8]) 
     }
 
     let mut dest = match TcpStream::connect(&host).await {
-        Ok(socket) => socket,
+        Ok(stream) => stream,
         Err(err) => {
             error!("Connect to {} failed, reason: {}", host, err.to_string());
             return;
         }
     };
-    let (mut sread, mut swrite) = socket.split();
+    let (mut sread, mut swrite) = stream.split();
     let (mut dread, mut dwrite) = dest.split();
     tokio::join!(
         tcp_forward(&mut dread, &mut swrite),
