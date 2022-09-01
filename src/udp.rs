@@ -15,8 +15,16 @@ async fn udp_server_to_client(socket: &UdpSocket, cwrite: &mut WriteHalf<'_>, mu
     let mut payload = [0u8; 65536];
     loop {
         let (payload_len, addr) = match socket.recv_from(&mut payload[24..]).await {
+            Ok((len, _)) if len == 0 => break,
             Ok(rs) => rs,
-            Err(_) => break,
+            Err(err) => {
+                error!(
+                    "receive data from addr {} failed, reason: {}",
+                    socket.peer_addr().unwrap().to_string(),
+                    err.to_string()
+                );
+                break;
+            }
         };
         info!(
             "read udp server len: {}, raddr: {}",
