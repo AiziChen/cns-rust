@@ -162,7 +162,7 @@ async fn udp_client_to_server(
         } else {
             payload_len = 0;
         }
-        println!("payload_len: {}, rlen: {}", payload_len, rlen);
+        info!("payload_len: {}, rlen: {}", payload_len, rlen);
     }
 }
 
