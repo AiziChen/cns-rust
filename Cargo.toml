@@ -30,5 +30,5 @@ opt-level = 'z'
 overflow-checks = false 
 panic = 'unwind' 
 rpath = false 
-split-debuginfo = '...' # Platform-specific.
+split-debuginfo = 'off'
 strip = true
