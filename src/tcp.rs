@@ -1,29 +1,13 @@
 use std::io::Error;
 
 use log::{error, info};
-use once_cell::sync::Lazy;
-use regex::bytes::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 
 use crate::cipher::{decrypt_host, xor_cipher};
 use crate::dns::dns_tcp_over_udp;
-
-const HOST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Meng:\s*(.*)\r").unwrap());
-
-pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
-    for cap in HOST_RE.captures_iter(&buf) {
-        return match cap.get(1) {
-            None => None,
-            Some(host) => match String::from_utf8(host.as_bytes().to_owned()) {
-                Ok(host) => Some(host),
-                Err(_) => None,
-            },
-        };
-    }
-    return None;
-}
+use crate::tools::get_proxy_host;
 
 pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) -> Result<(), Error> {
     let mut buf = [0; 65536];

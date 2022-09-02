@@ -14,10 +14,13 @@ pub fn decrypt_host(host: &str) -> Option<String> {
     return match base64::decode(host) {
         Ok(mut host) => {
             xor_cipher(&mut host, "quanyec", 0);
-            Some(String::from_utf8_lossy(&host[0..host.len() - 1]).to_string())
+            return match String::from_utf8(host[0..host.len() - 1].to_owned()) {
+                Ok(host) => Some(host),
+                Err(_) => None,
+            };
         }
         Err(err) => {
-            error!("Error: {}", err.to_string());
+            error!("secret host decode error: {}", err.to_string());
             None
         }
     };

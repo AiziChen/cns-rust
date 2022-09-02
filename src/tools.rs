@@ -7,6 +7,7 @@ const METHOD_RE: Lazy<Regex> = Lazy::new(|| {
     )
     .unwrap()
 });
+const HOST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Meng:\s*(.*)\r").unwrap());
 
 pub fn is_http_header(data: &[u8]) -> bool {
     return METHOD_RE.is_match(data);
@@ -40,6 +41,19 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     return haystack
         .windows(needle.len())
         .position(|window| window == needle);
+}
+
+pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
+    for cap in HOST_RE.captures_iter(&buf) {
+        return match cap.get(1) {
+            None => None,
+            Some(host) => match String::from_utf8(host.as_bytes().to_owned()) {
+                Ok(host) => Some(host),
+                Err(_) => None,
+            },
+        };
+    }
+    return None;
 }
 
 #[test]
