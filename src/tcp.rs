@@ -16,7 +16,10 @@ pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
     for cap in HOST_RE.captures_iter(&buf) {
         return match cap.get(1) {
             None => None,
-            Some(host) => Some(String::from_utf8_lossy(host.as_bytes()).to_string()),
+            Some(host) => match String::from_utf8(host.as_bytes().to_owned()) {
+                Ok(host) => Some(host),
+                Err(_) => None,
+            },
         };
     }
     return None;
@@ -48,11 +51,11 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) -> Re
 }
 
 pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) {
-    let mut host = match get_proxy_host(&buf) {
+    let host = match get_proxy_host(&buf) {
         Some(host) => host,
         None => return,
     };
-    let mut host = match decrypt_host(&mut host) {
+    let mut host = match decrypt_host(&host) {
         Some(host) => host,
         None => return,
     };
