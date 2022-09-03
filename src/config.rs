@@ -1,6 +1,10 @@
 use log::warn;
+use mimalloc::MiMalloc;
 use rlimit::{setrlimit, Resource};
 use std::mem;
+
+#[global_allocator]
+static GLOABL: MiMalloc = MiMalloc;
 
 /**
  * Support `TCP_FASTOPEN` on Linux 3.7 and above
