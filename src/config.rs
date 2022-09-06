@@ -1,7 +1,8 @@
 use log::warn;
 use mimalloc::MiMalloc;
 use rlimit::{setrlimit, Resource};
-use std::mem;
+use std::net::TcpListener;
+use std::{mem, os::unix::prelude::AsRawFd};
 
 #[global_allocator]
 static GLOABL: MiMalloc = MiMalloc;
@@ -9,11 +10,12 @@ static GLOABL: MiMalloc = MiMalloc;
 /**
  * Support `TCP_FASTOPEN` on Linux 3.7 and above
  */
-pub fn enable_tcp_fastopen(sockfd: i32) -> bool {
+#[cfg(not(target_os = "windows"))]
+pub fn enable_tcp_fastopen(stream: &TcpListener) -> bool {
     let queue: libc::c_int = 1;
     unsafe {
         let ret = libc::setsockopt(
-            sockfd,
+            stream.as_raw_fd(),
             libc::IPPROTO_TCP,
             libc::TCP_FASTOPEN,
             &queue as *const _ as *const libc::c_void,

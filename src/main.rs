@@ -1,12 +1,10 @@
 use std::error::Error;
-use std::os::unix::prelude::AsRawFd;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::thread::spawn;
 
-use async_recursion::async_recursion;
 use config::set_max_nofile;
 use log::{error, info};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::spawn;
 
 use crate::config::enable_tcp_fastopen;
 use crate::tcp::handle_tcp_session;
@@ -20,19 +18,19 @@ mod tcp;
 mod tools;
 mod udp;
 
-async fn response_header(stream: &mut TcpStream, buf: &[u8]) -> bool {
+fn response_header(stream: &mut TcpStream, buf: &[u8]) -> bool {
     if bytes_contains(&buf, "WebSocket".as_bytes()) {
-        if let Err(e) = stream.write_all("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: CuteBi Network Tunnel, (%>w<%)\r\n\r\n".as_bytes()).await {
+        if let Err(e) = stream.write_all("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: CuteBi Network Tunnel, (%>w<%)\r\n\r\n".as_bytes()) {
             error!("failed to write to socket; err = {}", e.to_string());
             return false;
         }
     } else if bytes_contains(&buf, "CON".as_bytes()) {
-        if let Err(e) = stream.write_all("HTTP/1.1 200 Connection established\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
+        if let Err(e) = stream.write_all("HTTP/1.1 200 Connection established\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()) {
             error!("failed to write to socket; err = {}", e.to_string());
             return false;
         }
     } else {
-        if let Err(e) = stream.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
+        if let Err(e) = stream.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()) {
             error!("failed to write to socket; err = {}", e.to_string());
             return false;
         }
@@ -41,10 +39,9 @@ async fn response_header(stream: &mut TcpStream, buf: &[u8]) -> bool {
     return true;
 }
 
-#[async_recursion]
-async fn handle_connection(mut stream: &mut TcpStream) {
+fn handle_connection(mut stream: TcpStream) {
     let mut buf = [0; 65536];
-    let len = match (&mut stream).read(&mut buf).await {
+    let len = match (&mut stream).read(&mut buf) {
         Ok(len) if len == 0 => return,
         Ok(len) => len,
         Err(err) => {
@@ -55,32 +52,31 @@ async fn handle_connection(mut stream: &mut TcpStream) {
 
     if is_http_header(&buf[..len]) {
         /* process TCP */
-        let status = response_header(&mut stream, &buf[..len]).await;
+        let status = response_header(&mut stream, &buf[..len]);
         if status {
             if !bytes_contains(&buf[..len], b"httpUDP") {
-                handle_tcp_session(&mut stream, &mut buf[..len]).await;
+                handle_tcp_session(stream, &mut buf[..len]);
             } else {
-                handle_connection(&mut stream).await;
+                handle_connection(stream);
             }
         }
     } else {
         /* process UDP */
-        handle_udp_session(&mut stream, &mut buf[..len]).await;
+        handle_udp_session(stream, &mut buf[..len]);
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     std::env::set_var("RUST_LOG", "cns_rust");
     env_logger::init();
     set_max_nofile();
-    let listener = TcpListener::bind("[::]:1080").await?;
-    enable_tcp_fastopen(listener.as_raw_fd());
+    let listener = TcpListener::bind("[::]:1080").unwrap();
+    enable_tcp_fastopen(&listener);
     loop {
-        let (mut stream, _) = listener.accept().await?;
-        spawn(async move {
+        let (stream, _) = listener.accept().expect("accpet tcp stream occurred error");
+        spawn(move || {
             info!("Handle a new connection...");
-            handle_connection(&mut stream).await;
+            handle_connection(stream)
         });
     }
 }
