@@ -1,7 +1,7 @@
 use log::warn;
 use mimalloc::MiMalloc;
 use rlimit::{setrlimit, Resource};
-use std::mem;
+use tokio::net::TcpListener;
 
 #[global_allocator]
 static GLOABL: MiMalloc = MiMalloc;
@@ -9,11 +9,14 @@ static GLOABL: MiMalloc = MiMalloc;
 /**
  * Support `TCP_FASTOPEN` on Linux 3.7 and above
  */
-pub fn enable_tcp_fastopen(sockfd: i32) -> bool {
+#[cfg(unix)]
+pub fn enable_tcp_fastopen(stream: &TcpListener) -> bool {
+    use std::{mem, os::unix::prelude::AsRawFd};
+
     let queue: libc::c_int = 1;
     unsafe {
         let ret = libc::setsockopt(
-            sockfd,
+            stream.as_raw_fd(),
             libc::IPPROTO_TCP,
             libc::TCP_FASTOPEN,
             &queue as *const _ as *const libc::c_void,
@@ -31,6 +34,7 @@ pub fn enable_tcp_fastopen(sockfd: i32) -> bool {
 
 const DEFAULT_SOFT_LIMIT: u64 = 4 * 1024 * 1024;
 const DEFAULT_HARD_LIMIT: u64 = 8 * 1024 * 1024;
+#[cfg(unix)]
 pub fn set_max_nofile() {
     setrlimit(Resource::FSIZE, DEFAULT_SOFT_LIMIT, DEFAULT_HARD_LIMIT)
         .expect("Set `FSIZE` limit error");

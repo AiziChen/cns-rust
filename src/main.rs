@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::os::unix::prelude::AsRawFd;
 
 use async_recursion::async_recursion;
 use config::set_max_nofile;
@@ -75,7 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     set_max_nofile();
     let listener = TcpListener::bind("[::]:1080").await?;
-    enable_tcp_fastopen(listener.as_raw_fd());
+    enable_tcp_fastopen(&listener);
     loop {
         let (mut stream, _) = listener.accept().await?;
         spawn(async move {
