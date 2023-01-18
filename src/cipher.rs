@@ -7,7 +7,7 @@ pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
         rem = (sub_index + i) % s_len;
         *b ^= secret[rem] | (rem as u8);
     }
-    return rem + 1;
+    rem + 1
 }
 
 pub fn decrypt_host(host: &str) -> Option<String> {
@@ -44,6 +44,6 @@ fn xor_cipher_test() {
         drem = xor_cipher(&mut buf[2..], SECRET, drem);
         assert_eq!(drem, SECRET.len() - 1);
 
-        assert_eq!(String::from_utf8_lossy(&buf).to_string(), raw_msg);
+        assert_eq!(String::from_utf8_lossy(buf).to_string(), raw_msg);
     }
 }

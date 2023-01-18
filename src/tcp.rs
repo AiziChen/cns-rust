@@ -17,7 +17,7 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) -> Re
             Ok(len) => {
                 if len > 0 {
                     rem = xor_cipher(&mut buf[..len], "quanyec", rem);
-                    if let Err(err) = dest.write(&mut buf[..len]).await {
+                    if let Err(err) = dest.write(&buf[..len]).await {
                         error!("write data occurred error: {}", err.to_string());
                         return Err(err);
                     }
@@ -34,8 +34,8 @@ pub async fn tcp_forward(src: &mut ReadHalf<'_>, dest: &mut WriteHalf<'_>) -> Re
     }
 }
 
-pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) {
-    let host = match get_proxy_host(&buf) {
+pub async fn handle_tcp_session(stream: &mut TcpStream, buf: &mut [u8]) {
+    let host = match get_proxy_host(buf) {
         Some(host) => host,
         None => return,
     };
@@ -47,11 +47,11 @@ pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) 
 
     // TODO: `dns-over-udp` configuration
     if host.ends_with(":53") {
-        dns_tcp_over_udp(&mut stream, &host, &mut buf).await;
+        dns_tcp_over_udp(stream, &host, buf).await;
         return;
     }
 
-    if !host.contains(":") {
+    if !host.contains(':') {
         host.push_str(":80")
     }
 

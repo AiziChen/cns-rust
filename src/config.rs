@@ -25,9 +25,9 @@ pub fn enable_tcp_fastopen(stream: &TcpListener) -> bool {
         if ret < 0 {
             let err = std::io::Error::last_os_error();
             warn!("Set `TCP_FASTOPEN` error: {:?}", err);
-            return false;
+            false
         } else {
-            return true;
+            true
         }
     }
 }

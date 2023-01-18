@@ -133,16 +133,16 @@ async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> Result<i32, Erro
         pkg_sub = pkg_sub + 2 + pkg_len;
     }
 
-    return Ok(pkg_sub as i32);
+    Ok(pkg_sub as i32)
 }
 
 async fn udp_client_to_server(
     udp_socket: &UdpSocket,
     cread: &mut ReadHalf<'_>,
-    mut buf: &mut [u8],
+    buf: &mut [u8],
     mut c2s_rem: usize,
 ) -> Result<(), Error> {
-    let wlen = match write_to_server(udp_socket, &mut buf).await {
+    let wlen = match write_to_server(udp_socket, buf).await {
         Ok(len) => len,
         Err(err) => {
             return Err(err);
@@ -158,7 +158,7 @@ async fn udp_client_to_server(
         payload_len = 0;
     };
     loop {
-        let rlen = match cread.read(&mut buf).await {
+        let rlen = match cread.read(buf).await {
             Ok(len) if len == 0 => break,
             Ok(len) => len,
             Err(err) => {
@@ -179,7 +179,7 @@ async fn udp_client_to_server(
         let wlen = wlen as usize;
         if wlen < payload_len {
             payload.copy_within(wlen..payload_len, 0);
-            payload_len = payload_len - wlen;
+            payload_len -= wlen;
         } else {
             payload_len = 0;
         }
@@ -189,13 +189,13 @@ async fn udp_client_to_server(
     Ok(())
 }
 
-pub async fn handle_udp_session(cstream: &mut TcpStream, mut buf: &mut [u8]) {
+pub async fn handle_udp_session(cstream: &mut TcpStream, buf: &mut [u8]) {
     let mut de = [0u8; 5];
     de.copy_from_slice(&buf[..5]);
     xor_cipher(&mut de, "quanyec", 0);
 
     let c2s_rem = if de[2] == 0 || de[3] == 0 || de[4] == 0 {
-        xor_cipher(&mut buf, "quanyec", 0)
+        xor_cipher(buf, "quanyec", 0)
     } else {
         error!("Not httpUDP protocol");
         return;

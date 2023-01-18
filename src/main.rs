@@ -20,24 +20,22 @@ mod tools;
 mod udp;
 
 async fn response_header(stream: &mut TcpStream, buf: &[u8]) -> bool {
-    if bytes_contains(&buf, "WebSocket".as_bytes()) {
+    if bytes_contains(buf, "WebSocket".as_bytes()) {
         if let Err(e) = stream.write_all("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: CuteBi Network Tunnel, (%>w<%)\r\n\r\n".as_bytes()).await {
             error!("failed to write to socket; err = {}", e.to_string());
             return false;
         }
-    } else if bytes_contains(&buf, "CON".as_bytes()) {
+    } else if bytes_contains(buf, "CON".as_bytes()) {
         if let Err(e) = stream.write_all("HTTP/1.1 200 Connection established\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
             error!("failed to write to socket; err = {}", e.to_string());
             return false;
         }
-    } else {
-        if let Err(e) = stream.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
-            error!("failed to write to socket; err = {}", e.to_string());
-            return false;
-        }
+    } else if let Err(e) = stream.write_all("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nServer: CuteBi Network Tunnel, (%>w<%)\r\nConnection: keep-alive\r\n\r\n".as_bytes()).await {
+        error!("failed to write to socket; err = {}", e.to_string());
+        return false;
     }
 
-    return true;
+    true
 }
 
 #[async_recursion]
@@ -54,17 +52,17 @@ async fn handle_connection(mut stream: &mut TcpStream) {
 
     if is_http_header(&buf[..len]) {
         /* process TCP */
-        let status = response_header(&mut stream, &buf[..len]).await;
+        let status = response_header(stream, &buf[..len]).await;
         if status {
             if !bytes_contains(&buf[..len], b"httpUDP") {
-                handle_tcp_session(&mut stream, &mut buf[..len]).await;
+                handle_tcp_session(stream, &mut buf[..len]).await;
             } else {
-                handle_connection(&mut stream).await;
+                handle_connection(stream).await;
             }
         }
     } else {
         /* process UDP */
-        handle_udp_session(&mut stream, &mut buf[..len]).await;
+        handle_udp_session(stream, &mut buf[..len]).await;
     }
 }
 

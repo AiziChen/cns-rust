@@ -5,10 +5,10 @@ use tokio::{
     net::{TcpStream, UdpSocket},
 };
 
-pub async fn dns_tcp_over_udp(socket: &mut TcpStream, host: &str, mut buf: &mut [u8]) {
+pub async fn dns_tcp_over_udp(socket: &mut TcpStream, host: &str, buf: &mut [u8]) {
     info!("Starting dns-tcp-over-udp");
 
-    let rlen = match socket.read(&mut buf).await {
+    let rlen = match socket.read(buf).await {
         Ok(len) if len == 0 => return,
         Ok(len) => len,
         Err(err) => {
