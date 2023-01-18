@@ -64,6 +64,8 @@ pub async fn handle_tcp_session(mut stream: &mut TcpStream, mut buf: &mut [u8]) 
     };
     let (mut sread, mut swrite) = stream.split();
     let (mut dread, mut dwrite) = dest.split();
+
+    info!("starting tcp forward...");
     let _ = tokio::try_join!(
         tcp_forward(&mut dread, &mut swrite),
         tcp_forward(&mut sread, &mut dwrite),

@@ -1,4 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::{
+    io::{Error, ErrorKind},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+};
 
 use crate::cipher::xor_cipher;
 use log::{error, info};
@@ -10,7 +13,11 @@ use tokio::{
     },
 };
 
-async fn udp_server_to_client(socket: &UdpSocket, cwrite: &mut WriteHalf<'_>, mut s2c_rem: usize) {
+async fn udp_server_to_client(
+    socket: &UdpSocket,
+    cwrite: &mut WriteHalf<'_>,
+    mut s2c_rem: usize,
+) -> Result<(), Error> {
     let mut ignore_head_len: usize;
     let mut payload = [0u8; 65536];
     loop {
@@ -38,9 +45,6 @@ async fn udp_server_to_client(socket: &UdpSocket, cwrite: &mut WriteHalf<'_>, mu
             payload[14..18].copy_from_slice(&[0, 0, 0, 1]);
             if let IpAddr::V4(ip) = addr.ip() {
                 payload[18..22].copy_from_slice(&ip.octets());
-            } else {
-                error!("failed to get v4 address {}", addr.to_string());
-                break;
             }
         } else {
             ignore_head_len = 0;
@@ -49,9 +53,6 @@ async fn udp_server_to_client(socket: &UdpSocket, cwrite: &mut WriteHalf<'_>, mu
             payload[2..6].copy_from_slice(&[0, 0, 0, 3]);
             if let IpAddr::V6(ip) = addr.ip() {
                 payload[6..22].copy_from_slice(&ip.octets());
-            } else {
-                error!("failed to get v6 address {}", addr.to_string());
-                break;
             }
         }
 
@@ -62,26 +63,32 @@ async fn udp_server_to_client(socket: &UdpSocket, cwrite: &mut WriteHalf<'_>, mu
             "quanyec",
             s2c_rem,
         );
-        if let Err(err) = cwrite
+        match cwrite
             .write(&payload[ignore_head_len..24 + payload_len])
             .await
         {
-            error!("Write udp data to server error: {}", err.to_string());
-            break;
+            Ok(len) if len == 0 => return Err(Error::new(ErrorKind::WriteZero, "write zero data")),
+            Ok(_) => (),
+            Err(err) => {
+                error!("Write udp data to server error: {}", err.to_string());
+                return Err(err);
+            }
         }
     }
+
+    Ok(())
 }
 
-async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> i32 {
+async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> Result<i32, Error> {
     let mut pkg_sub = 0usize;
     while pkg_sub + 2 < buf.len() {
         let pkg_len = (buf[pkg_sub] as u16 | ((buf[pkg_sub + 1] as u16) << 8)) as usize;
         info!("pkgSub: {}, pkgLen: {}, {}", pkg_sub, pkg_len, buf.len());
         if pkg_sub + 2 + pkg_len > buf.len() || pkg_len <= 10 {
-            return 0;
+            return Ok(0);
         }
         if buf.starts_with(&[0u8; 2]) {
-            return 1;
+            return Ok(1);
         }
         let (addr, udp_header_len) = if buf[5] == 1 {
             /* ipv4 */
@@ -95,7 +102,7 @@ async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> i32 {
             (addr, 12)
         } else {
             if pkg_len <= 24 {
-                return 0;
+                return Ok(0);
             }
             /* ipv6 */
             let ipv6 = Ipv6Addr::from(u128::from_be_bytes(
@@ -108,21 +115,25 @@ async fn write_to_server(socket: &UdpSocket, buf: &mut [u8]) -> i32 {
             (addr, 24)
         };
         // write to destination
-        if let Err(err) = socket
+        match socket
             .send_to(
                 &buf[(pkg_sub + udp_header_len)..(pkg_sub + 2 + pkg_len)],
                 addr,
             )
             .await
         {
-            error!("send client data to UDP server error: {}", err.to_string());
-            return -1;
+            Ok(len) if len == 0 => return Err(Error::new(ErrorKind::WriteZero, "write zero data")),
+            Ok(_) => (),
+            Err(err) => {
+                error!("send client data to UDP server error: {}", err.to_string());
+                return Err(err);
+            }
         }
 
         pkg_sub = pkg_sub + 2 + pkg_len;
     }
 
-    return pkg_sub as i32;
+    return Ok(pkg_sub as i32);
 }
 
 async fn udp_client_to_server(
@@ -130,11 +141,13 @@ async fn udp_client_to_server(
     cread: &mut ReadHalf<'_>,
     mut buf: &mut [u8],
     mut c2s_rem: usize,
-) {
-    let wlen = write_to_server(udp_socket, &mut buf).await;
-    if wlen == -1 {
-        return;
-    }
+) -> Result<(), Error> {
+    let wlen = match write_to_server(udp_socket, &mut buf).await {
+        Ok(len) => len,
+        Err(err) => {
+            return Err(err);
+        }
+    };
     let mut payload = [0u8; 65536];
     let mut payload_len: usize;
     let wlen = wlen as usize;
@@ -150,7 +163,7 @@ async fn udp_client_to_server(
             Ok(len) => len,
             Err(err) => {
                 error!("read data occurred error from client: {}", err.to_string());
-                break;
+                return Err(err);
             }
         };
         c2s_rem = xor_cipher(
@@ -159,10 +172,10 @@ async fn udp_client_to_server(
             c2s_rem,
         );
         payload_len += rlen;
-        let wlen = write_to_server(udp_socket, &mut payload[..payload_len]).await;
-        if wlen == -1 {
-            break;
-        }
+        let wlen = match write_to_server(udp_socket, &mut payload[..payload_len]).await {
+            Ok(len) => len,
+            Err(err) => return Err(err),
+        };
         let wlen = wlen as usize;
         if wlen < payload_len {
             payload.copy_within(wlen..payload_len, 0);
@@ -172,6 +185,8 @@ async fn udp_client_to_server(
         }
         info!("payload_len: {}, rlen: {}", payload_len, rlen);
     }
+
+    Ok(())
 }
 
 pub async fn handle_udp_session(cstream: &mut TcpStream, mut buf: &mut [u8]) {
@@ -196,8 +211,9 @@ pub async fn handle_udp_session(cstream: &mut TcpStream, mut buf: &mut [u8]) {
 
     info!("starting UDP forward...");
     let (mut cread, mut cwrite) = cstream.split();
-    tokio::join!(
+    let _ = tokio::try_join!(
         udp_client_to_server(&udp_socket, &mut cread, buf, c2s_rem),
         udp_server_to_client(&udp_socket, &mut cwrite, 0)
     );
+    info!("udp connection ended");
 }
