@@ -9,8 +9,8 @@ static METHOD_RE: Lazy<Regex> = Lazy::new(|| {
 });
 static HOST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Meng:\s*(.*)\r").unwrap());
 
-pub fn is_http_header(data: &[u8]) -> bool {
-    METHOD_RE.is_match(data)
+pub fn is_http_header(data: &str) -> bool {
+    METHOD_RE.is_match(data.as_bytes())
 }
 
 pub fn bytes_contains(buf: &[u8], dest: &[u8]) -> bool {
@@ -40,12 +40,9 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle);
 }
 
-pub fn get_proxy_host(buf: &[u8]) -> Option<String> {
-    let host = HOST_RE.captures_iter(buf).next()?.get(1)?;
-    return match String::from_utf8(host.as_bytes().to_owned()) {
-        Ok(host) => Some(host),
-        Err(_) => None,
-    };
+pub fn get_proxy_host(header: &str) -> Option<String> {
+    let host = HOST_RE.captures_iter(header.as_bytes()).next()?.get(1)?;
+    return String::from_utf8(host.as_bytes().to_owned()).ok();
 }
 
 #[test]

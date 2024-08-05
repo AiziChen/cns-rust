@@ -189,13 +189,13 @@ async fn udp_client_to_server(
     Ok(())
 }
 
-pub async fn handle_udp_session(cstream: &mut TcpStream, buf: &mut [u8]) {
+pub async fn handle_udp_session(cstream: &mut TcpStream, header: &mut [u8]) {
     let mut de = [0u8; 5];
-    de.copy_from_slice(&buf[..5]);
+    de.copy_from_slice(&header[..5]);
     xor_cipher(&mut de, "quanyec", 0);
 
     let c2s_rem = if de[2] == 0 || de[3] == 0 || de[4] == 0 {
-        xor_cipher(buf, "quanyec", 0)
+        xor_cipher(header, "quanyec", 0)
     } else {
         error!("Not httpUDP protocol");
         return;
@@ -212,7 +212,7 @@ pub async fn handle_udp_session(cstream: &mut TcpStream, buf: &mut [u8]) {
     info!("starting UDP forward...");
     let (mut cread, mut cwrite) = cstream.split();
     let _ = tokio::try_join!(
-        udp_client_to_server(&udp_socket, &mut cread, buf, c2s_rem),
+        udp_client_to_server(&udp_socket, &mut cread, header, c2s_rem),
         udp_server_to_client(&udp_socket, &mut cwrite, 0)
     );
     info!("udp connection ended");
