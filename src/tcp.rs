@@ -37,7 +37,7 @@ pub async fn handle_tcp_session(stream: &mut TcpStream, header: &str) {
     let Some(host) = get_proxy_host(header) else {
         return;
     };
-    let Some(mut host) = decrypt_host(&host) else {
+    let Some(mut host) = decrypt_host(&host, "quanyec") else {
         return;
     };
     info!("proxy host: {}", host);

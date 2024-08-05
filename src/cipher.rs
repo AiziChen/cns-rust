@@ -1,3 +1,4 @@
+use base64::Engine;
 use log::error;
 pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
     let secret = secret.as_bytes();
@@ -10,10 +11,10 @@ pub fn xor_cipher(data: &mut [u8], secret: &str, sub_index: usize) -> usize {
     rem + 1
 }
 
-pub fn decrypt_host(host: &str) -> Option<String> {
-    return match base64::decode(host) {
+pub fn decrypt_host(host: &str, secret: &str) -> Option<String> {
+    return match base64::engine::general_purpose::STANDARD.decode(host) {
         Ok(mut host) => {
-            xor_cipher(&mut host, "quanyec", 0);
+            xor_cipher(&mut host, secret, 0);
             return String::from_utf8(host[0..host.len() - 1].to_owned()).ok();
         }
         Err(err) => {
